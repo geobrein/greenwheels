@@ -1,13 +1,12 @@
-# --- .github/workflows/run-script.yml ---
 name: Run R script every hour at :35
 
 on:
   schedule:
-    - cron: "35 * * * *"   # elk uur op :35 (UTC)
+    - cron: "35 * * * *"
   workflow_dispatch:
 
 permissions:
-  contents: write  # nodig om terug te committen
+  contents: write
 
 jobs:
   run-r:
@@ -20,6 +19,17 @@ jobs:
 
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
+
+      # installeer de benodigde packages
+      - name: Install R packages
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            any::httr
+            any::jsonlite
+            any::dplyr
+            any::purrr
+            any::tidyr
 
       - name: Run script
         run: Rscript script.R
