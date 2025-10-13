@@ -49,18 +49,17 @@ res <- httr::POST(
 httr::stop_for_status(res)
 out <- httr::content(res, as = "parsed", type = "application/json")
 
-# Voeg runtime-datum/tijdkolommen toe (Europe/Amsterdam) aan de pipeline
+# Eén consistente timestamp in Europe/Amsterdam
 tz_now <- as.POSIXct(Sys.time(), tz = "Europe/Amsterdam")
 
-# Flatten -> pak 1e (enige) auto per locatie -> unnest naar vlakke kolommen
 locs <- jsonlite::fromJSON(jsonlite::toJSON(out$data$locations, auto_unbox = TRUE), flatten = TRUE) %>%
-  dplyr::mutate(
+  mutate(
     car = purrr::map(cars, function(x) {
       if (is.null(x) || length(x) == 0) return(NULL)
       if (is.data.frame(x)) as.list(x[1, , drop = FALSE]) else x[[1]]
     })
   ) %>%
-  dplyr::select(-cars) %>%
+  select(-cars) %>%
   tidyr::unnest_wider(car, names_sep = ".") %>%
   mutate(
     across(c(isRailway, isDiscount, isSpecialAccess, car.isInUse, car.hasKey, car.availability.available), as.logical),
@@ -71,10 +70,34 @@ locs <- jsonlite::fromJSON(jsonlite::toJSON(out$data$locations, auto_unbox = TRU
     weekday = format(tz_now, "%A")
   )
 
-# Schrijf naar CSV met timestamp in bestandsnaam
-datetime <- format(Sys.time(), "%Y%m%d%H%M")
+# 1) per-run snapshot
 dir.create("data", showWarnings = FALSE)
+datetime <- format(tz_now, "%Y%m%d%H%M")  # gebruik dezelfde timestamp
 outfile <- file.path("data", paste0("locations_", datetime, ".csv"))
 write.csv(locs, outfile, row.names = FALSE, fileEncoding = "UTF-8")
+cat("Wrote snapshot:", outfile, "\n")
 
-cat("Wrote:", outfile, "\n")
+# 2) Deventer incremental
+inc_path <- "data/deventer_incremental.csv"
+
+deventer <- locs %>%
+  filter(city.name == "Deventer") %>%
+  mutate(run_ts = format(tz_now, "%Y-%m-%d %H:%M:%S %Z"))
+
+if (file.exists(inc_path)) {
+  old <- read.csv(inc_path, stringsAsFactors = FALSE, check.names = FALSE)
+  all_names <- union(names(old), names(deventer))
+  old[setdiff(all_names, names(old))] <- NA
+  deventer[setdiff(all_names, names(deventer))] <- NA
+  old <- old[all_names]; deventer <- deventer[all_names]
+  all <- dplyr::bind_rows(old, deventer)
+  key <- c("car.id","date","hour","minute")
+  if (all(key %in% names(all))) {
+    all <- dplyr::distinct(all, dplyr::across(all_of(key)), .keep_all = TRUE)
+  }
+} else {
+  all <- deventer
+}
+
+write.csv(all, inc_path, row.names = FALSE, fileEncoding = "UTF-8")
+cat("Updated incremental:", inc_path, "rows:", nrow(all), "\n")
