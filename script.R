@@ -49,7 +49,9 @@ res <- httr::POST(
 httr::stop_for_status(res)
 out <- httr::content(res, as = "parsed", type = "application/json")
 
-# Eén consistente timestamp in Europe/Amsterdam
+# Eén consistente timestamp in Europa/Amsterdam
+tz <- "Europe/Amsterdam"
+Sys.setenv(TZ = tz)
 tz_now <- as.POSIXct(Sys.time(), tz = "Europe/Amsterdam")
 
 locs <- jsonlite::fromJSON(jsonlite::toJSON(out$data$locations, auto_unbox = TRUE), flatten = TRUE) %>%
@@ -101,3 +103,4 @@ if (file.exists(inc_path)) {
 
 write.csv(all, inc_path, row.names = FALSE, fileEncoding = "UTF-8")
 cat("Updated incremental:", inc_path, "rows:", nrow(all), "\n")
+
