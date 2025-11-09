@@ -40,7 +40,7 @@ res <- httr::POST(
   httr::add_headers(
     `Content-Type` = "application/json",
     `apollographql-client-name` = "web",
-    `apollographql-client-version` = "v5.28.14"
+    `apollographql-client-version` = "v5.30.2"
   ),
   body = list(operationName = "locations", query = q, variables = list()),
   encode = "json"
@@ -103,3 +103,4 @@ if (file.exists(inc_path)) {
 
 write.csv(all, inc_path, row.names = FALSE, fileEncoding = "UTF-8")
 cat("Updated incremental:", inc_path, "rows:", nrow(all), "\n")
+
